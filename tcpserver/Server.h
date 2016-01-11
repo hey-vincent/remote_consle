@@ -24,7 +24,7 @@ public:
 private:
 	// attribute
 	SOCKET m_server_socket;					// server socket instance
-	vector<SOCKET> m_vec_clients;			// clients waiting room
+	vector<pair<SOCKET,sockaddr_in>> m_vec_clients;			// clients waiting room
 	int	m_server_port;
 	int m_client_maxcount;					// max client counts for listening
 	string m_server_ip;
@@ -32,6 +32,10 @@ private:
 
 	// method
 	static DWORD WINAPI thread_Listen_Client(LPVOID lp);
-	static DWORD WINAPI thread_communicate(LPVOID lp);
+	static DWORD WINAPI thread_send(LPVOID lp);
+	static DWORD WINAPI thread_recv(LPVOID lp);
+
+	HANDLE m_hEventForListen;
+	bool	  m_isbreak;
 };
 

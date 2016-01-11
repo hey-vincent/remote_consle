@@ -9,7 +9,7 @@ using namespace std;
 
 SOCKET client_sock;
 
-bool connect()
+int connect()
 {
 	WSADATA ws;
 	if (WSAStartup(MAKEWORD(2,2), &ws) != 0)
@@ -41,6 +41,32 @@ bool connect()
 	return true;
 }
 
+typedef struct _cmd
+{
+	string stType;
+	string stContent;
+
+	_cmd()
+	{
+		stType = "";
+		stContent = "";
+	}
+}Command;
+
+string ParseCommand(char* cmd)
+{
+	string stCmd = cmd;
+	if (cmd == "KILL" || cmd == "kill")
+	{
+
+	}
+
+	if (cmd == "GO" || cmd == "go")
+	{
+
+	}
+	return "ACK";
+}
 int _tmain(int argc, _TCHAR* argv[])
 {
 	char recv_buf[MAX_PATH] = {0};
@@ -48,9 +74,14 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		while(true)
 		{
-			if( recv(client_sock,recv_buf,MAX_PATH,0) != 0 && client_sock != INVALID_SOCKET)
+			if( recv(client_sock,recv_buf,MAX_PATH,0) > 0 && client_sock != INVALID_SOCKET)
 			{
 				cout << "Received message from server: " << recv_buf << endl;
+				send(client_sock, ParseCommand(recv_buf).data(), ParseCommand(recv_buf).size(), 0);
+			}
+			else
+			{
+				connect();
 			}
 		}
 		

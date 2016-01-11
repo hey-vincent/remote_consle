@@ -9,6 +9,8 @@ Server::Server(string ip, int port, int client_count)
 	m_server_port = port;
 	m_client_maxcount = client_count;
 	m_vec_clients.clear();
+	m_hEventForListen = CreateEvent(NULL,TRUE,FALSE,_T("Accepted"));
+	m_isbreak = false;
 	//m_vec_clients.reserve(10);
 }
 
@@ -69,7 +71,8 @@ DWORD WINAPI Server::thread_Listen_Client(LPVOID lp)
 		if((client_sock = accept(pthis->m_server_socket,(sockaddr*)&(pthis->m_server_addr), &addr_len)) != INVALID_SOCKET)
 		{
 			cout << "new client whose socket: " << client_sock << "connected. " << endl;
-			pthis->m_vec_clients.push_back(client_sock);
+			SetEvent(pthis->m_hEventForListen);
+			//pthis->m_vec_clients.push_back(client_sock);
 		}
 		Sleep(400);
 	}
@@ -77,7 +80,7 @@ DWORD WINAPI Server::thread_Listen_Client(LPVOID lp)
 }
 
 // communicating with client
-DWORD WINAPI Server::thread_communicate(LPVOID lp)
+DWORD WINAPI Server::thread_send(LPVOID lp)
 {
 	Server* pthis = (Server*)lp;
 	string strCmd;
@@ -85,36 +88,98 @@ DWORD WINAPI Server::thread_communicate(LPVOID lp)
 	{
 		cout << '\t'<< endl;
 		getline(cin, strCmd, '\n');
-		int len = 0;
-		if((len = send(pthis->m_vec_clients.front(),strCmd.data(),strCmd.size(), 0) )!= 0)
+		if (strCmd == "exit")
 		{
-			cout << "Send message " << len << endl;
+			pthis->m_isbreak = true;
+			return 1;
+		}
+
+		if (pthis->m_vec_clients.empty())
+		{
+			// do nothing
+		}
+		else
+		{
+			int len = 0;
+			if ((len = send(pthis->m_vec_clients.front().first, strCmd.data(), strCmd.size(), 0)) != 0)
+			{
+				//cout << "Send message " << len << endl;
+			}
+		}
+		
+		Sleep(400);
+	}
+	return 0;
+}
+
+DWORD WINAPI Server::thread_recv(LPVOID lp)
+{
+	Server* pthis = (Server*)lp;
+	string strCmd;
+	char buf[512] = {};
+	memset(buf,0, 512);
+	while (1)
+	{
+
+		int len = 0;
+		if (!pthis->m_vec_clients.empty())
+		{
+			if (recv(pthis->m_vec_clients[0].first, buf, 512, 0) > 0)
+			{
+				cout << inet_ntoa(pthis->m_vec_clients[0].second.sin_addr) << ": " << buf << endl;
+			}
 		}
 		Sleep(400);
 	}
 	return 0;
 }
 
+
 bool Server::run()
 {
-	HANDLE hThread;
+	HANDLE hListen;
+	HANDLE hSend;
+	HANDLE hRecv;
+
 	if (init() == 0)
 	{
 		cout << "Server running..." << endl;
+
+		hSend = CreateThread(NULL, 0, thread_send, this, 0, NULL);
+		hRecv = CreateThread(NULL, 0, thread_recv, this, 0, NULL);
+
+		sockaddr_in sock;
 		int addr_len = sizeof(sockaddr_in);
+
 		SOCKET client_sock;
 
-		HANDLE hListen = CreateThread(NULL, 0, thread_Listen_Client, this,0, NULL);
+		while (1)
+		{
+			if ((client_sock = accept(m_server_socket, (sockaddr*)&sock/*(m_server_addr)*/, &addr_len)) != INVALID_SOCKET)
+			{
+				cout << "new client whose socket: " << client_sock << "connected. " << endl;
+				SetEvent(m_hEventForListen);
+				
+				m_vec_clients.push_back(make_pair(client_sock, sock)/*client_sock*/);
+
+			}
+			if (m_isbreak)
+			{
+				TerminateThread(thread_send, 0);
+				WSACleanup();
+				closesocket(m_server_socket);
+				return true;
+			}
+			Sleep(400);
+		}
+
+
+	/*	hListen = CreateThread(NULL, 0, thread_Listen_Client, this,0, NULL);
 		if(hListen == NULL){
 			cout << "failed to create accept thread with error " << GetLastError() << endl;
 			return false;
-		}
+		}*/
 
-		if (!m_vec_clients.empty()){
-			hThread = CreateThread(NULL, 0, thread_communicate, this, 0, NULL);
-		}
-		
-		WaitForSingleObject(hListen,INFINITE);
 		return true;
 	}
 	return false;
