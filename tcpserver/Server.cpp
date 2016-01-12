@@ -61,18 +61,19 @@ int Server::init()
 }
 
 // accept connection from client
-DWORD WINAPI Server::thread_Listen_Client(LPVOID lp)
+DWORD WINAPI Server::thread_Listen(LPVOID lp)
 {
 	Server *pthis = (Server*)lp;
 	int addr_len = sizeof(sockaddr_in);
 	SOCKET client_sock;
+	sockaddr_in client_addr;
 	while (1)
 	{
-		if((client_sock = accept(pthis->m_server_socket,(sockaddr*)&(pthis->m_server_addr), &addr_len)) != INVALID_SOCKET)
+		if((client_sock = accept(pthis->m_server_socket,(sockaddr*)&client_addr, &addr_len)) != INVALID_SOCKET)
 		{
-			cout << "new client whose socket: " << client_sock << "connected. " << endl;
+			cout << endl <<inet_ntoa(client_addr.sin_addr) << client_sock << "connected. " << endl;
+			pthis->push(client_sock, client_addr);
 			SetEvent(pthis->m_hEventForListen);
-			//pthis->m_vec_clients.push_back(client_sock);
 		}
 		Sleep(400);
 	}
@@ -97,33 +98,15 @@ DWORD WINAPI Server::thread_send(LPVOID lp)
 	string strCmd;
 	while(1)
 	{
-		cout << '\t'<< endl;
+		cout << "\t>";
 		getline(cin, strCmd, '\n');
-		if (strCmd == "cp")
-		{
-			Copy();
-			Sleep(400);
-			continue;
-			// ÒÆ¶¯ÎÄ¼þ
-			//ReplaceFile();
 
-		}
-		if (strCmd == "exit")
-		{
-			pthis->m_isbreak = true;
-			return 1;
-		}
 
-		if (pthis->m_vec_clients.empty())
-		{
-			// do nothing
-		}
-		else
+		if (pthis->Distribute(strCmd.data())) // true for this msg should be sent to client ; if false: Distrubute(msg) will process this message 
 		{
 			int len = 0;
-			if ((len = send(pthis->m_vec_clients.front().first, strCmd.data(), strCmd.size(), 0)) != 0)
+			if ((len = send(pthis->client(), strCmd.data(), strCmd.size(), 0)) > 0)
 			{
-				//cout << "Send message " << len << endl;
 			}
 		}
 		
@@ -142,11 +125,11 @@ DWORD WINAPI Server::thread_recv(LPVOID lp)
 	{
 
 		int len = 0;
-		if (!pthis->m_vec_clients.empty())
+		if (pthis->client() != INVALID_SOCKET)
 		{
-			if (recv(pthis->m_vec_clients[0].first, buf, 512, 0) > 0)
+			if (recv(pthis->client(), buf, 512, 0) > 0)
 			{
-				cout << inet_ntoa(pthis->m_vec_clients[0].second.sin_addr) << ": " << buf << endl;
+				cout << inet_ntoa(pthis->m_vec_clients.back().second.sin_addr) << ": " << buf << endl;
 			}
 		}
 		Sleep(400);
@@ -165,22 +148,22 @@ bool Server::run()
 	{
 		cout << "Server running..." << endl;
 
-		hSend = CreateThread(NULL, 0, thread_send, this, 0, NULL);
-		hRecv = CreateThread(NULL, 0, thread_recv, this, 0, NULL);
+		m_hSend = CreateThread(NULL, 0, thread_send, this, 0, NULL);
+		m_hRecv = CreateThread(NULL, 0, thread_recv, this, 0, NULL);
 
 		sockaddr_in sock;
 		int addr_len = sizeof(sockaddr_in);
 
 		SOCKET client_sock;
 
-		while (1)
+		/*while (1)
 		{
-			if ((client_sock = accept(m_server_socket, (sockaddr*)&sock/*(m_server_addr)*/, &addr_len)) != INVALID_SOCKET)
+			if ((client_sock = accept(m_server_socket, (sockaddr*)&sock, &addr_len)) != INVALID_SOCKET)
 			{
 				cout << "new client whose socket: " << client_sock << "connected. " << endl;
 				SetEvent(m_hEventForListen);
-				
-				m_vec_clients.push_back(make_pair(client_sock, sock)/*client_sock*/);
+
+				m_vec_clients.push_back(make_pair(client_sock, sock));
 
 			}
 			if (m_isbreak)
@@ -191,17 +174,107 @@ bool Server::run()
 				return true;
 			}
 			Sleep(400);
-		}
+		}*/
 
-
-	/*	hListen = CreateThread(NULL, 0, thread_Listen_Client, this,0, NULL);
-		if(hListen == NULL){
+		// Create thread for waiting client
+		m_hListen = CreateThread(NULL, 0, thread_Listen, this,0, NULL);
+		if(m_hListen == NULL){
 			cout << "failed to create accept thread with error " << GetLastError() << endl;
 			return false;
-		}*/
+		}
+		WaitForSingleObject(m_hEventForListen, INFINITE);
+		WaitForSingleObject(m_hRecv, INFINITE);
+		WaitForSingleObject(m_hSend, INFINITE);
 
 		return true;
 	}
 	return false;
 }
 
+void Server::push(SOCKET client_sock, sockaddr_in client_addr)
+{
+	vector<pair<SOCKET, sockaddr_in>>::iterator iter;
+	for (iter = m_vec_clients.begin(); iter != m_vec_clients.end(); iter++)
+	{
+		if (iter->second.sin_addr.S_un.S_addr == client_addr.sin_addr.S_un.S_addr)
+		{
+			// if found: update information
+			iter->first = client_sock;
+			return;
+		}
+	}
+	// if not found: insert
+	m_vec_clients.push_back(make_pair(client_sock, client_addr));
+}
+
+SOCKET Server::client()
+{
+	if (!m_vec_clients.empty())
+	{
+		return m_vec_clients.back().first;
+	}
+	return INVALID_SOCKET;
+}
+
+bool Server:: Distribute( const char* msg)
+{
+	if (*msg == '\0' || *msg == ' ')
+	{
+		return false;
+	}
+
+	if (memcmp(msg, "clear", 6) == 0 || memcmp(msg, "cls", 4) == 0)
+	{
+		system("cls");
+		return true;
+	}
+
+	if (memcmp(msg,"exit", 4) == 0)
+	{
+		TerminateThread(m_hSend, 0);
+		TerminateThread(m_hRecv, 0);
+		TerminateThread(m_hListen, 0);
+		SetEvent(m_hEventForListen);
+		
+		WSACleanup();
+		closesocket(m_server_socket);
+		system("exit");
+		return false;
+	}
+
+	if (memcmp(msg, "debug",5) == 0)
+	{
+		cout << "  :Replace File.";
+		if (client() != INVALID_SOCKET)
+		{
+			send(client(), "kill", 5, 0);
+			Sleep(200);
+			// copy file
+			Copy();
+			Sleep(1500);
+			// start
+			send(client(), "go", 5, 0);
+			return true;
+		}
+		return false;
+	}
+
+	if (memcmp(msg, "rp", 2) == 0)
+	{
+		cout << "  :Replace File.";
+		if (client() != INVALID_SOCKET)
+		{
+			send(client(), "kill", 5, 0);
+			Sleep(200);
+			// copy file
+			Copy();
+			Sleep(1500);
+			// start
+			send(client(), "go", 5, 0);
+			return true;
+		}
+		return false;
+	}
+
+	return true;
+}
