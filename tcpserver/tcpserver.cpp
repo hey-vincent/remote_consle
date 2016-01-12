@@ -7,7 +7,7 @@
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	string stIP = "192.168.0.111";
+	string stIP = "172.18.117.13";
 	Server svr(stIP,5000,10);
 	svr.run();
 

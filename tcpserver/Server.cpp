@@ -79,6 +79,17 @@ DWORD WINAPI Server::thread_Listen_Client(LPVOID lp)
 	return 0;
 }
 
+void Copy()
+{
+	SHFILEOPSTRUCT fop;
+	ZeroMemory(&fop, sizeof fop);
+	fop.wFunc = FO_COPY;
+	fop.pFrom = _T("F:\\Macau_Code\\MO_DEVICE\\Device\\bin\\TVM.exe\0");
+	fop.pTo = _T("\\\\172.18.119.187\\tvm\0");
+
+	SHFileOperation(&fop);
+}
+
 // communicating with client
 DWORD WINAPI Server::thread_send(LPVOID lp)
 {
@@ -88,6 +99,15 @@ DWORD WINAPI Server::thread_send(LPVOID lp)
 	{
 		cout << '\t'<< endl;
 		getline(cin, strCmd, '\n');
+		if (strCmd == "cp")
+		{
+			Copy();
+			Sleep(400);
+			continue;
+			// ÒÆ¶¯ÎÄ¼þ
+			//ReplaceFile();
+
+		}
 		if (strCmd == "exit")
 		{
 			pthis->m_isbreak = true;
