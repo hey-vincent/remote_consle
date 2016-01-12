@@ -32,7 +32,7 @@ int connect()
 	SOCKADDR_IN server_sock;
 	server_sock.sin_family = AF_INET;
 	server_sock.sin_port = 5000;
-	server_sock.sin_addr.s_addr = inet_addr("172.18.117.13");
+	server_sock.sin_addr.s_addr = inet_addr("192.168.0.114");
 	memset(server_sock.sin_zero,0,sizeof(server_sock.sin_zero));
 
 	if( connect(client_sock,(sockaddr*)&server_sock,sizeof(SOCKADDR_IN)) == INVALID_SOCKET)
@@ -58,14 +58,19 @@ typedef struct _cmd
 
 string ParseCommand(char* cmd)
 {	
-	if (memcmp("kill", cmd, 4) == 0)
+	if (memcmp("clear", cmd, 5) == 0 || memcmp("cls", cmd, 5) == 0)
+	{
+		system("cls");
+	}
+	if (memcmp("kill", cmd, 5) == 0)
 	{
 		exe.kill_process(_T("Guardian.exe"));
+		Sleep(100);
 		exe.kill_process(_T("TVM.exe"));
 		return "ACK";
 	}
 
-	if (memcmp("go", cmd,2) == 0)
+	if (memcmp("go", cmd,3) == 0)
 	{
 		//system("cd C:\TVM");
 		//system("tvm.exe");
@@ -111,7 +116,6 @@ int _tmain(int argc, _TCHAR* argv[])
 			{
 				cout << "Received message from server: " << recv_buf << ".Length : " << nLen<< endl;
 				ParseCommand(recv_buf);
-				//send(client_sock, ParseCommand(recv_buf).data(), ParseCommand(recv_buf).size(), 0);
 			}
 			else
 			{
