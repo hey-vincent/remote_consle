@@ -2,16 +2,29 @@
 //
 
 #include "stdafx.h"
-#include <WinSock2.h>
 #include <iostream>
-#include "Execute.h"
-using namespace std;
-#pragma comment (lib, "ws2_32.lib")
-#include <windows.h>
-#include <atlstr.h>
+#include <string>
+#include <map>
+#include <algorithm>
+#include <fstream>
 
+#include "Execute.h"
+
+#include <WinSock2.h>
+#include <atlstr.h>
+#pragma comment (lib, "ws2_32.lib")
+
+using namespace std;
 SOCKET client_sock;
 Execute exe;
+map<string, string> map_settings;
+
+
+int load_setting();
+void parse_setting(string setting);
+void show_settins();
+
+
 int connect()
 {
 	WSADATA ws;
@@ -31,8 +44,8 @@ int connect()
 
 	SOCKADDR_IN server_sock;
 	server_sock.sin_family = AF_INET;
-	server_sock.sin_port = 5000;
-	server_sock.sin_addr.s_addr = inet_addr("192.168.0.114");
+	server_sock.sin_port = atoi(map_settings["port"].data());
+	server_sock.sin_addr.s_addr = inet_addr(map_settings["ip"].data());
 	memset(server_sock.sin_zero,0,sizeof(server_sock.sin_zero));
 
 	if( connect(client_sock,(sockaddr*)&server_sock,sizeof(SOCKADDR_IN)) == INVALID_SOCKET)
@@ -105,6 +118,8 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 	int nLen = 0;
 	char recv_buf[MAX_PATH] = {0};
+	load_setting();
+
 	if (connect())
 	{
 		while(true)
@@ -128,3 +143,51 @@ int _tmain(int argc, _TCHAR* argv[])
 	return 0;
 }
 
+int load_setting()
+{
+	char buf[1024];                //临时保存读取出来的文件内容
+	string message;
+	ifstream infile;
+	infile.open(".//trmlt.txt");
+	if (infile.is_open())          //文件打开成功,说明曾经写入过东西
+	{
+		while (infile.good() && !infile.eof())
+		{
+			memset(buf, 0, 1024);
+			infile.getline(buf, 1204);
+			message = buf;
+			parse_setting(message);
+		}
+		infile.close();
+	}
+	show_settins();
+	return 0;
+}
+
+void parse_setting(string setting)
+{
+	string::iterator iter;
+	string key = "";
+	string val = "";
+	if ((iter = find(setting.begin(), setting.end(), '=')) != setting.end())
+	{
+		key.assign(setting.begin(), iter);
+		val.assign(iter + 1, setting.end());
+		map_settings[key] = val;
+	}
+}
+
+void show_settins()
+{
+	if (map_settings.empty())
+	{
+		cout << "settings empty" << endl;
+		return;
+	}
+	map<string, string>::iterator iter = map_settings.begin();
+	while (iter != map_settings.end())
+	{
+		cout << iter->first << "\t" << iter->second << endl;
+		iter++;
+	}
+}

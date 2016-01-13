@@ -1,4 +1,6 @@
 #pragma once
+#include <atlstr.h>
+
 class Execute
 {
 public:
