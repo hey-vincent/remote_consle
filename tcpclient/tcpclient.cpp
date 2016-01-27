@@ -75,6 +75,7 @@ string ParseCommand(char* cmd)
 	{
 		system("cls");
 	}
+
 	if (memcmp("kill", cmd, 5) == 0)
 	{
 		exe.kill_process(_T("Guardian.exe"));
