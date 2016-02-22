@@ -11,6 +11,8 @@ Server::Server(string ip, int port, int client_count)
 	m_vec_clients.clear();
 	m_hEventForListen = CreateEvent(NULL,TRUE,FALSE,_T("Accepted"));
 	m_isbreak = false;
+
+	m_Mutex = CreateMutex(NULL, FALSE, _T("Quit"));
 	//m_vec_clients.reserve(10);
 }
 
@@ -96,11 +98,15 @@ DWORD WINAPI Server::thread_send(LPVOID lp)
 {
 	Server* pthis = (Server*)lp;
 	string strCmd;
-	while(1)
+	WaitForSingleObject(pthis->m_Mutex, INFINITE);
+	while(1) 
 	{
 		cout << "\t>";
 		getline(cin, strCmd, '\n');
-
+		if (memcmp(strCmd.data(), "quit", 4) == 0)	// Release this mutex so that main thread can quit.
+		{
+			ReleaseMutex(pthis->m_Mutex);
+		}
 
 		if (pthis->Distribute(strCmd.data())) // true for this msg should be sent to client ; if false: Distrubute(msg) will process this message 
 		{
@@ -148,43 +154,17 @@ bool Server::run()
 	{
 		cout << "Server running..." << endl;
 
-		m_hSend = CreateThread(NULL, 0, thread_send, this, 0, NULL);
-		m_hRecv = CreateThread(NULL, 0, thread_recv, this, 0, NULL);
-
-		sockaddr_in sock;
-		int addr_len = sizeof(sockaddr_in);
-
-		SOCKET client_sock;
-
-		/*while (1)
-		{
-			if ((client_sock = accept(m_server_socket, (sockaddr*)&sock, &addr_len)) != INVALID_SOCKET)
-			{
-				cout << "new client whose socket: " << client_sock << "connected. " << endl;
-				SetEvent(m_hEventForListen);
-
-				m_vec_clients.push_back(make_pair(client_sock, sock));
-
-			}
-			if (m_isbreak)
-			{
-				TerminateThread(thread_send, 0);
-				WSACleanup();
-				closesocket(m_server_socket);
-				return true;
-			}
-			Sleep(400);
-		}*/
-
-		// Create thread for waiting client
-		m_hListen = CreateThread(NULL, 0, thread_Listen, this,0, NULL);
-		if(m_hListen == NULL){
+		m_hSend = CreateThread(NULL, 0, thread_send, this, 0, NULL);	// Thread for sending message to client
+		m_hRecv = CreateThread(NULL, 0, thread_recv, this, 0, NULL);	// Thread for receiving reply from client
+		m_hLstn = CreateThread(NULL, 0, thread_Listen, this,0, NULL);	// Thread for listening client's connection
+		if(m_hLstn == NULL){
 			cout << "failed to create accept thread with error " << GetLastError() << endl;
 			return false;
 		}
-		WaitForSingleObject(m_hEventForListen, INFINITE);
+		WaitForSingleObject(m_Mutex, INFINITE);
+		/*WaitForSingleObject(m_hEventForListen, INFINITE);
 		WaitForSingleObject(m_hRecv, INFINITE);
-		WaitForSingleObject(m_hSend, INFINITE);
+		WaitForSingleObject(m_hSend, INFINITE);*/
 
 		return true;
 	}
@@ -233,7 +213,7 @@ bool Server:: Distribute( const char* msg)
 	{
 		TerminateThread(m_hSend, 0);
 		TerminateThread(m_hRecv, 0);
-		TerminateThread(m_hListen, 0);
+		TerminateThread(m_hLstn, 0);
 		SetEvent(m_hEventForListen);
 		
 		WSACleanup();
