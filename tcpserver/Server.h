@@ -44,7 +44,7 @@ private:
 	HANDLE m_hLstn;
 	HANDLE m_hSend;
 	HANDLE m_hRecv;
-	HANDLE m_Mutex;											// Block for prevent returnning of main thread
+	HANDLE m_hQuitEvent;											// Block for prevent returnning of main thread
 
 	static DWORD WINAPI thread_Listen(LPVOID lp);
 	static DWORD WINAPI thread_send(LPVOID lp);

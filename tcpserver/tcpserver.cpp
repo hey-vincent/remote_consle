@@ -24,7 +24,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	Server svr(map_settings["ip"], atoi(map_settings["port"].data()) , 10);
 	svr.run();
 
-	system("pause");
+	/*system("pause");*/
 	return 0;
 }
 

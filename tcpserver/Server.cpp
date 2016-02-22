@@ -9,10 +9,10 @@ Server::Server(string ip, int port, int client_count)
 	m_server_port = port;
 	m_client_maxcount = client_count;
 	m_vec_clients.clear();
-	m_hEventForListen = CreateEvent(NULL,TRUE,FALSE,_T("Accepted"));
 	m_isbreak = false;
 
-	m_Mutex = CreateMutex(NULL, FALSE, _T("Quit"));
+	m_hQuitEvent = CreateEvent(NULL, TRUE, FALSE, _T("Quit"));
+	ResetEvent(m_hQuitEvent);
 	//m_vec_clients.reserve(10);
 }
 
@@ -98,14 +98,14 @@ DWORD WINAPI Server::thread_send(LPVOID lp)
 {
 	Server* pthis = (Server*)lp;
 	string strCmd;
-	WaitForSingleObject(pthis->m_Mutex, INFINITE);
+	//WaitForSingleObject(pthis->m_hQuitEvent, INFINITE);
 	while(1) 
 	{
 		cout << "\t>";
 		getline(cin, strCmd, '\n');
 		if (memcmp(strCmd.data(), "quit", 4) == 0)	// Release this mutex so that main thread can quit.
 		{
-			ReleaseMutex(pthis->m_Mutex);
+			SetEvent(pthis->m_hQuitEvent);
 		}
 
 		if (pthis->Distribute(strCmd.data())) // true for this msg should be sent to client ; if false: Distrubute(msg) will process this message 
@@ -161,8 +161,8 @@ bool Server::run()
 			cout << "failed to create accept thread with error " << GetLastError() << endl;
 			return false;
 		}
-		WaitForSingleObject(m_Mutex, INFINITE);
-		/*WaitForSingleObject(m_hEventForListen, INFINITE);
+		WaitForSingleObject(m_hQuitEvent, INFINITE);					// wait the signal for quit.
+		/*WaitForSingleObject(m_hLstn, INFINITE);
 		WaitForSingleObject(m_hRecv, INFINITE);
 		WaitForSingleObject(m_hSend, INFINITE);*/
 
@@ -214,7 +214,6 @@ bool Server:: Distribute( const char* msg)
 		TerminateThread(m_hSend, 0);
 		TerminateThread(m_hRecv, 0);
 		TerminateThread(m_hLstn, 0);
-		SetEvent(m_hEventForListen);
 		
 		WSACleanup();
 		closesocket(m_server_socket);

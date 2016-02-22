@@ -1,9 +1,14 @@
-#pragma once
+
 #include <deque>
+#include <string>
+#include <map>
+
+using namespace std;
+
 class Commander
 {
 public:
-	Commander(char* cmd, int nlen);
+	Commander(/*char* cmd, int nlen*/);
 	~Commander();
 
 private:
